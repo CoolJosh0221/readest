@@ -10,7 +10,14 @@ import {
   ViewConfig,
   ViewSettings,
 } from '@/types/book';
-import { KOSyncSettings, ReadSettings, SystemSettings } from '@/types/settings';
+import {
+  KOSyncSettings,
+  ReadSettings,
+  SystemSettings,
+  StorageProviderSettings,
+  WebDAVSettings,
+  GoogleDriveSettings,
+} from '@/types/settings';
 import { UserStorageQuota, UserDailyTranslationQuota } from '@/types/quota';
 import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config';
 import { stubTranslation as _ } from '@/utils/misc';
@@ -52,6 +59,30 @@ export const DEFAULT_KOSYNC_SETTINGS = {
   enabled: false,
 } as KOSyncSettings;
 
+export const DEFAULT_WEBDAV_SETTINGS: WebDAVSettings = {
+  enabled: false,
+  serverUrl: '',
+  username: '',
+  password: '',
+  basePath: '/Readest',
+};
+
+export const DEFAULT_GOOGLEDRIVE_SETTINGS: GoogleDriveSettings = {
+  enabled: false,
+  accessToken: '',
+  refreshToken: '',
+  folderId: 'root',
+};
+
+export const DEFAULT_STORAGE_PROVIDER_SETTINGS: StorageProviderSettings = {
+  activeProvider: 'readest',
+  readest: {
+    enabled: true,
+  },
+  webdav: DEFAULT_WEBDAV_SETTINGS,
+  googleDrive: DEFAULT_GOOGLEDRIVE_SETTINGS,
+};
+
 export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   keepLogin: false,
   autoUpload: true,
@@ -73,6 +104,7 @@ export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {
   libraryCoverFit: 'crop',
 
   kosync: DEFAULT_KOSYNC_SETTINGS,
+  storageProvider: DEFAULT_STORAGE_PROVIDER_SETTINGS,
 
   lastSyncedAtBooks: 0,
   lastSyncedAtConfigs: 0,

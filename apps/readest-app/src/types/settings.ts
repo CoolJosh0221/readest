@@ -11,6 +11,8 @@ export type LibraryCoverFitType = 'crop' | 'fit';
 export type KOSyncChecksumMethod = 'binary' | 'filename';
 export type KOSyncStrategy = 'prompt' | 'silent' | 'send' | 'receive';
 
+export type StorageProviderType = 'readest' | 'webdav' | 'googledrive';
+
 export interface ReadSettings {
   sideBarWidth: string;
   isSideBarPinned: boolean;
@@ -36,6 +38,30 @@ export interface KOSyncSettings {
   deviceName: string;
   checksumMethod: KOSyncChecksumMethod;
   strategy: KOSyncStrategy;
+}
+
+export interface WebDAVSettings {
+  enabled: boolean;
+  serverUrl: string;
+  username: string;
+  password: string;
+  basePath: string;
+}
+
+export interface GoogleDriveSettings {
+  enabled: boolean;
+  accessToken: string;
+  refreshToken: string;
+  folderId: string;
+}
+
+export interface StorageProviderSettings {
+  activeProvider: StorageProviderType;
+  readest: {
+    enabled: boolean;
+  };
+  webdav: WebDAVSettings;
+  googleDrive: GoogleDriveSettings;
 }
 
 export interface SystemSettings {
@@ -66,6 +92,7 @@ export interface SystemSettings {
   customTextures: CustomTexture[];
 
   kosync: KOSyncSettings;
+  storageProvider: StorageProviderSettings;
 
   lastSyncedAtBooks: number;
   lastSyncedAtConfigs: number;
