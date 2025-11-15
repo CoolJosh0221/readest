@@ -20,6 +20,7 @@ import { tauriHandleSetAlwaysOnTop, tauriHandleToggleFullScreen } from '@/utils/
 import { optInTelemetry, optOutTelemetry } from '@/utils/telemetry';
 import { setAboutDialogVisible } from '@/components/AboutWindow';
 import { setMigrateDataDirDialogVisible } from '@/app/library/components/MigrateDataWindow';
+import { setStorageProviderSettingsWindowVisible } from '@/app/library/components/StorageProviderSettings';
 import { saveSysSettings } from '@/helpers/settings';
 import UserAvatar from '@/components/UserAvatar';
 import MenuItem from '@/components/MenuItem';
@@ -172,6 +173,11 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
     setSettingsDialogOpen(true);
   };
 
+  const openStorageProviderSettings = () => {
+    setStorageProviderSettingsWindowVisible(true);
+    setIsDropdownOpen?.(false);
+  };
+
   const handleSetSavedBookCoverForLockScreen = () => {
     const newValue = settings.savedBookCoverForLockScreen ? '' : 'default';
     saveSysSettings(envConfig, 'savedBookCoverForLockScreen', newValue);
@@ -243,6 +249,10 @@ const SettingsMenu: React.FC<SettingsMenuProps> = ({ setIsDropdownOpen }) => {
         label={_('Auto Upload Books to Cloud')}
         toggled={isAutoUpload}
         onClick={toggleAutoUploadBooks}
+      />
+      <MenuItem
+        label={_('Storage Provider')}
+        onClick={openStorageProviderSettings}
       />
       {isTauriAppPlatform() && !appService?.isMobile && (
         <MenuItem

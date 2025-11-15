@@ -48,6 +48,7 @@ import { AboutWindow } from '@/components/AboutWindow';
 import { BookDetailModal } from '@/components/metadata';
 import { UpdaterWindow } from '@/components/UpdaterWindow';
 import { MigrateDataWindow } from './components/MigrateDataWindow';
+import { StorageProviderSettingsWindow } from './components/StorageProviderSettings';
 import { useDragDropImport } from './hooks/useDragDropImport';
 import { Toast } from '@/components/Toast';
 import Spinner from '@/components/Spinner';
@@ -715,6 +716,7 @@ const LibraryPageContent = ({ searchParams }: { searchParams: ReadonlyURLSearchP
       <AboutWindow />
       <UpdaterWindow />
       <MigrateDataWindow />
+      <StorageProviderSettingsWindow />
       {isSettingsDialogOpen && <SettingsDialog bookKey={''} />}
       <Toast />
     </div>
