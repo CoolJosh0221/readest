@@ -6,20 +6,33 @@ import type {
   FileInfo,
   ProgressHandler,
 } from '../types';
-import { google, type drive_v3 } from 'googleapis';
+
+interface DriveFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: string;
+  modifiedTime?: string;
+}
+
+interface DriveFilesResponse {
+  files: DriveFile[];
+}
 
 /**
  * Google Drive Storage Provider
- * Supports storing and syncing books via Google Drive
+ * Supports storing and syncing books via Google Drive using REST API
  */
 export class GoogleDriveStorageProvider extends BaseStorageProvider {
   name: StorageProviderType = 'googledrive';
   label = 'Google Drive';
   authRequired = true;
 
-  private drive: drive_v3.Drive | null = null;
-  private credentials: StorageCredentials['googleDrive'] | null = null;
+  private accessToken: string = '';
+  private refreshToken: string = '';
   private folderId: string = '';
+  private readonly baseUrl = 'https://www.googleapis.com/drive/v3';
+  private readonly uploadUrl = 'https://www.googleapis.com/upload/drive/v3';
 
   async connect(credentials: StorageCredentials): Promise<ConnectionResult> {
     try {
@@ -40,21 +53,24 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
         };
       }
 
-      // Create OAuth2 client
-      const oauth2Client = new google.auth.OAuth2();
-      oauth2Client.setCredentials({
-        access_token: accessToken,
-        refresh_token: refreshToken,
-      });
-
-      // Create Drive client
-      this.drive = google.drive({ version: 'v3', auth: oauth2Client });
-      this.credentials = credentials.googleDrive;
+      this.accessToken = accessToken;
+      this.refreshToken = refreshToken || '';
       this.folderId = folderId;
 
       // Test connection by getting user info
       try {
-        await this.drive.about.get({ fields: 'user' });
+        const response = await fetch(`${this.baseUrl}/about?fields=user`, {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        });
+
+        if (!response.ok) {
+          return {
+            success: false,
+            error: `Connection failed: ${response.statusText}`,
+          };
+        }
       } catch (error) {
         return {
           success: false,
@@ -62,28 +78,44 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
         };
       }
 
-      // Create Readest folder if it doesn't exist and folderId is 'root'
+      // Create Readest folder if folderId is 'root'
       if (folderId === 'root') {
         try {
           const folderName = 'Readest';
-          const response = await this.drive.files.list({
-            q: `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-            fields: 'files(id, name)',
-            spaces: 'drive',
-          });
-
-          if (response.data.files && response.data.files.length > 0) {
-            this.folderId = response.data.files[0].id!;
-          } else {
-            // Create folder
-            const folder = await this.drive.files.create({
-              requestBody: {
-                name: folderName,
-                mimeType: 'application/vnd.google-apps.folder',
+          const searchResponse = await fetch(
+            `${this.baseUrl}/files?q=${encodeURIComponent(
+              `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            )}&fields=files(id,name)&spaces=drive`,
+            {
+              headers: {
+                Authorization: `Bearer ${this.accessToken}`,
               },
-              fields: 'id',
-            });
-            this.folderId = folder.data.id!;
+            },
+          );
+
+          if (searchResponse.ok) {
+            const data: DriveFilesResponse = await searchResponse.json();
+            if (data.files && data.files.length > 0) {
+              this.folderId = data.files[0].id;
+            } else {
+              // Create folder
+              const createResponse = await fetch(`${this.baseUrl}/files`, {
+                method: 'POST',
+                headers: {
+                  Authorization: `Bearer ${this.accessToken}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  name: folderName,
+                  mimeType: 'application/vnd.google-apps.folder',
+                }),
+              });
+
+              if (createResponse.ok) {
+                const folder: DriveFile = await createResponse.json();
+                this.folderId = folder.id;
+              }
+            }
           }
         } catch (error) {
           console.warn('Failed to create Readest folder:', error);
@@ -105,13 +137,13 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
   }
 
   async disconnect(): Promise<void> {
-    this.drive = null;
-    this.credentials = null;
+    this.accessToken = '';
+    this.refreshToken = '';
     this.connected = false;
   }
 
   private ensureConnected(): void {
-    if (!this.drive || !this.connected) {
+    if (!this.accessToken || !this.connected) {
       throw new Error('Not connected to Google Drive');
     }
   }
@@ -123,27 +155,44 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
     this.ensureConnected();
 
     // Search for existing folder
-    const response = await this.drive!.files.list({
-      q: `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-      fields: 'files(id, name)',
-      spaces: 'drive',
-    });
+    const searchResponse = await fetch(
+      `${this.baseUrl}/files?q=${encodeURIComponent(
+        `name='${folderName}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+      )}&fields=files(id,name)&spaces=drive`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+      },
+    );
 
-    if (response.data.files && response.data.files.length > 0) {
-      return response.data.files[0].id!;
+    if (searchResponse.ok) {
+      const data: DriveFilesResponse = await searchResponse.json();
+      if (data.files && data.files.length > 0) {
+        return data.files[0].id;
+      }
     }
 
     // Create folder
-    const folder = await this.drive!.files.create({
-      requestBody: {
+    const createResponse = await fetch(`${this.baseUrl}/files`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
         name: folderName,
         mimeType: 'application/vnd.google-apps.folder',
         parents: [parentId],
-      },
-      fields: 'id',
+      }),
     });
 
-    return folder.data.id!;
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create folder: ${createResponse.statusText}`);
+    }
+
+    const folder: DriveFile = await createResponse.json();
+    return folder.id;
   }
 
   private async ensureDirectoryPath(remotePath: string): Promise<string> {
@@ -168,34 +217,54 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
 
     // Navigate through folders
     for (let i = 0; i < parts.length - 1; i++) {
-      const response = await this.drive!.files.list({
-        q: `name='${parts[i]}' and '${currentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-        fields: 'files(id, name)',
-        spaces: 'drive',
-      });
+      const response = await fetch(
+        `${this.baseUrl}/files?q=${encodeURIComponent(
+          `name='${parts[i]}' and '${currentFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+        )}&fields=files(id,name)&spaces=drive`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        },
+      );
 
-      if (!response.data.files || response.data.files.length === 0) {
+      if (!response.ok) {
         return null;
       }
 
-      currentFolderId = response.data.files[0].id!;
+      const data: DriveFilesResponse = await response.json();
+      if (!data.files || data.files.length === 0) {
+        return null;
+      }
+
+      currentFolderId = data.files[0].id;
     }
 
     // Find the file
     const fileName = parts[parts.length - 1];
-    const response = await this.drive!.files.list({
-      q: `name='${fileName}' and '${currentFolderId}' in parents and trashed=false`,
-      fields: 'files(id, name)',
-      spaces: 'drive',
-    });
+    const response = await fetch(
+      `${this.baseUrl}/files?q=${encodeURIComponent(
+        `name='${fileName}' and '${currentFolderId}' in parents and trashed=false`,
+      )}&fields=files(id,name)&spaces=drive`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+        },
+      },
+    );
 
-    if (!response.data.files || response.data.files.length === 0) {
+    if (!response.ok) {
+      return null;
+    }
+
+    const data: DriveFilesResponse = await response.json();
+    if (!data.files || data.files.length === 0) {
       return null;
     }
 
     return {
-      id: response.data.files[0].id!,
-      name: response.data.files[0].name!,
+      id: data.files[0].id,
+      name: data.files[0].name,
     };
   }
 
@@ -210,8 +279,6 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
       // Read the file from localPath
       const response = await fetch(localPath);
       const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
 
       const fileName = remotePath.split('/').pop() || 'file';
       const parentFolderId = await this.ensureDirectoryPath(remotePath);
@@ -219,32 +286,65 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
       // Check if file already exists
       const existingFile = await this.findFileByPath(remotePath);
 
-      const media = {
-        mimeType: blob.type || 'application/octet-stream',
-        body: Buffer.from(buffer),
-      };
-
       if (existingFile) {
-        // Update existing file
-        await this.drive!.files.update({
-          fileId: existingFile.id,
-          media,
-          fields: 'id',
-        });
-      } else {
-        // Create new file
-        await this.drive!.files.create({
-          requestBody: {
-            name: fileName,
-            parents: [parentFolderId],
+        // Update existing file using multipart upload
+        const metadata = {
+          name: fileName,
+        };
+
+        const form = new FormData();
+        form.append(
+          'metadata',
+          new Blob([JSON.stringify(metadata)], { type: 'application/json' }),
+        );
+        form.append('file', blob);
+
+        const updateResponse = await fetch(
+          `${this.uploadUrl}/files/${existingFile.id}?uploadType=multipart`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+            },
+            body: form,
           },
-          media,
-          fields: 'id',
-        });
+        );
+
+        if (!updateResponse.ok) {
+          throw new Error(`Failed to update file: ${updateResponse.statusText}`);
+        }
+      } else {
+        // Create new file using multipart upload
+        const metadata = {
+          name: fileName,
+          parents: [parentFolderId],
+        };
+
+        const form = new FormData();
+        form.append(
+          'metadata',
+          new Blob([JSON.stringify(metadata)], { type: 'application/json' }),
+        );
+        form.append('file', blob);
+
+        const createResponse = await fetch(
+          `${this.uploadUrl}/files?uploadType=multipart`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+            },
+            body: form,
+          },
+        );
+
+        if (!createResponse.ok) {
+          throw new Error(`Failed to create file: ${createResponse.statusText}`);
+        }
       }
 
       // Call progress handler with completion
-      this.handleProgress(buffer.length, buffer.length, onProgress);
+      this.handleProgress(blob.size, blob.size, onProgress);
     } catch (error) {
       throw new Error(
         `Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -267,17 +367,21 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
       }
 
       // Download the file
-      const response = await this.drive!.files.get(
+      const response = await fetch(
+        `${this.baseUrl}/files/${file.id}?alt=media`,
         {
-          fileId: file.id,
-          alt: 'media',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
         },
-        { responseType: 'arraybuffer' },
       );
 
+      if (!response.ok) {
+        throw new Error(`Failed to download file: ${response.statusText}`);
+      }
+
       // Convert to Blob and save
-      const buffer = response.data as ArrayBuffer;
-      const blob = new Blob([buffer]);
+      const blob = await response.blob();
 
       // In a browser environment, we'd use the File System Access API
       // For now, we'll create a download link
@@ -291,8 +395,7 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
       URL.revokeObjectURL(url);
 
       // Call progress handler with completion
-      const bufferLength = buffer.byteLength;
-      this.handleProgress(bufferLength, bufferLength, onProgress);
+      this.handleProgress(blob.size, blob.size, onProgress);
     } catch (error) {
       throw new Error(
         `Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -310,9 +413,16 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
         throw new Error('File not found');
       }
 
-      await this.drive!.files.delete({
-        fileId: file.id,
+      const response = await fetch(`${this.baseUrl}/files/${file.id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+        },
       });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete file: ${response.statusText}`);
+      }
     } catch (error) {
       throw new Error(
         `Failed to delete file: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -330,33 +440,53 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
       if (remotePath && remotePath !== '/') {
         const parts = remotePath.split('/').filter((p) => p);
         for (const part of parts) {
-          const response = await this.drive!.files.list({
-            q: `name='${part}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
-            fields: 'files(id, name)',
-            spaces: 'drive',
-          });
+          const response = await fetch(
+            `${this.baseUrl}/files?q=${encodeURIComponent(
+              `name='${part}' and '${folderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+            )}&fields=files(id,name)&spaces=drive`,
+            {
+              headers: {
+                Authorization: `Bearer ${this.accessToken}`,
+              },
+            },
+          );
 
-          if (!response.data.files || response.data.files.length === 0) {
+          if (!response.ok) {
             return [];
           }
 
-          folderId = response.data.files[0].id!;
+          const data: DriveFilesResponse = await response.json();
+          if (!data.files || data.files.length === 0) {
+            return [];
+          }
+
+          folderId = data.files[0].id;
         }
       }
 
       // List files in the folder
-      const response = await this.drive!.files.list({
-        q: `'${folderId}' in parents and trashed=false`,
-        fields:
-          'files(id, name, size, modifiedTime, mimeType)',
-        spaces: 'drive',
-      });
+      const response = await fetch(
+        `${this.baseUrl}/files?q=${encodeURIComponent(
+          `'${folderId}' in parents and trashed=false`,
+        )}&fields=files(id,name,size,modifiedTime,mimeType)&spaces=drive`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        },
+      );
 
-      if (!response.data.files) {
+      if (!response.ok) {
+        throw new Error(`Failed to list files: ${response.statusText}`);
+      }
+
+      const data: DriveFilesResponse = await response.json();
+
+      if (!data.files) {
         return [];
       }
 
-      return response.data.files.map((file) => ({
+      return data.files.map((file) => ({
         name: file.name || '',
         path: remotePath + '/' + file.name,
         size: parseInt(file.size || '0', 10),
@@ -382,19 +512,28 @@ export class GoogleDriveStorageProvider extends BaseStorageProvider {
       }
 
       // Get file metadata
-      const response = await this.drive!.files.get({
-        fileId: file.id,
-        fields: 'id, name, size, modifiedTime, mimeType',
-      });
+      const response = await fetch(
+        `${this.baseUrl}/files/${file.id}?fields=id,name,size,modifiedTime,mimeType`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+          },
+        },
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data: DriveFile = await response.json();
 
       return {
-        name: response.data.name || '',
+        name: data.name || '',
         path: remotePath,
-        size: parseInt(response.data.size || '0', 10),
-        modifiedAt: new Date(response.data.modifiedTime || Date.now()),
-        isDirectory:
-          response.data.mimeType === 'application/vnd.google-apps.folder',
-        id: response.data.id || undefined,
+        size: parseInt(data.size || '0', 10),
+        modifiedAt: new Date(data.modifiedTime || Date.now()),
+        isDirectory: data.mimeType === 'application/vnd.google-apps.folder',
+        id: data.id || undefined,
       };
     } catch (error) {
       return null;
