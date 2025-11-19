@@ -1,10 +1,11 @@
+'use client';
+
 import clsx from 'clsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { useEnv } from '@/context/EnvContext';
 import { useTranslation } from '@/hooks/useTranslation';
 import { useSettingsStore } from '@/store/settingsStore';
 import { StorageProviderType } from '@/types/settings';
-import { storageService } from '@/services/storage';
 import { debounce } from '@/utils/debounce';
 import Dialog from '@/components/Dialog';
 
@@ -157,6 +158,9 @@ export const StorageProviderSettingsWindow: React.FC = () => {
     setConnectionStatus('connecting');
 
     try {
+      // Dynamically import storage service to avoid SSR issues
+      const { storageService } = await import('@/services/storage');
+
       const result = await storageService.setActiveProvider('webdav', {
         webdav: {
           url: webdavUrl,
