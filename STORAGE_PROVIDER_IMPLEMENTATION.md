@@ -1,10 +1,10 @@
 # Storage Provider Implementation for Readest
 
-This document describes the WebDAV and Google Drive integration implementation for Readest.
+This document describes the WebDAV integration implementation for Readest.
 
 ## Overview
 
-Added support for alternative storage providers (WebDAV and Google Drive) alongside the existing Readest Cloud storage. Users can now choose their preferred storage backend for storing and syncing books.
+Added support for WebDAV as an alternative storage provider alongside the existing Readest Cloud storage. Users can now choose between Readest Cloud or their own WebDAV server (Nextcloud, ownCloud, etc.) for storing and syncing books.
 
 ## Implementation Details
 
@@ -16,7 +16,6 @@ Created a provider-based architecture in `/apps/readest-app/src/services/storage
 - **providers/base.ts**: Abstract base class for all providers
 - **providers/readest.ts**: Wrapper for existing Readest Cloud storage
 - **providers/webdav.ts**: WebDAV provider implementation
-- **providers/googledrive.ts**: Google Drive provider implementation
 - **providers/index.ts**: Provider registry
 - **service.ts**: Storage service orchestrator
 - **index.ts**: Main export file
@@ -25,9 +24,8 @@ Created a provider-based architecture in `/apps/readest-app/src/services/storage
 
 Added to `/apps/readest-app/src/types/settings.ts`:
 
-- `StorageProviderType`: Type for provider selection ('readest' | 'webdav' | 'googledrive')
+- `StorageProviderType`: Type for provider selection ('readest' | 'webdav')
 - `WebDAVSettings`: WebDAV configuration interface
-- `GoogleDriveSettings`: Google Drive configuration interface
 - `StorageProviderSettings`: Overall storage provider settings
 - Updated `SystemSettings` to include `storageProvider` field
 
@@ -36,7 +34,6 @@ Added to `/apps/readest-app/src/types/settings.ts`:
 Updated `/apps/readest-app/src/services/constants.ts`:
 
 - `DEFAULT_WEBDAV_SETTINGS`: Default WebDAV configuration
-- `DEFAULT_GOOGLEDRIVE_SETTINGS`: Default Google Drive configuration
 - `DEFAULT_STORAGE_PROVIDER_SETTINGS`: Default provider settings
 - Added to `DEFAULT_SYSTEM_SETTINGS`
 
@@ -45,11 +42,10 @@ Updated `/apps/readest-app/src/services/constants.ts`:
 Created `/apps/readest-app/src/app/library/components/StorageProviderSettings.tsx`:
 
 - Dialog-based settings interface
-- Provider selection dropdown
+- Provider selection dropdown (Readest Cloud / WebDAV)
 - WebDAV connection form (URL, username, password, base path)
-- Google Drive connection interface
 - Connection testing and status display
-- Enable/disable functionality for each provider
+- Enable/disable functionality
 
 Updated `/apps/readest-app/src/app/library/components/SettingsMenu.tsx`:
 
@@ -65,7 +61,6 @@ Updated `/apps/readest-app/src/app/library/page.tsx`:
 Added to `/apps/readest-app/package.json`:
 
 - `webdav`: ^5.8.0 - WebDAV client library
-- `googleapis`: Already present in dependencies
 
 ## Features
 
@@ -77,38 +72,47 @@ Added to `/apps/readest-app/package.json`:
 - **Connection Testing**: Verify server connectivity before enabling
 - **File Operations**: Upload, download, delete, list files
 - **Directory Management**: Automatic directory creation
-
-### Google Drive Support
-
-- **OAuth2 Authentication**: Secure OAuth2 flow (to be implemented)
-- **Folder Selection**: Choose specific folder or use root
-- **File Operations**: Upload, download, delete, list files
-- **Directory Navigation**: Hierarchical folder support
+- **Client-Side Rendering**: Properly handles SSR with lazy-loaded providers
 
 ## Usage
 
 1. **Access Settings**: Click on the settings menu in the library view
 2. **Select Storage Provider**: Choose "Storage Provider" from the menu
-3. **Configure Provider**:
-   - For WebDAV: Enter server URL, username, password, and base path
-   - For Google Drive: Complete OAuth flow and select folder
-4. **Test Connection**: Click connect button to verify settings
-5. **Enable Provider**: Once connected, the provider becomes active
+3. **Configure WebDAV**:
+   - Enter server URL (e.g., `https://cloud.example.com/remote.php/dav/files/username`)
+   - Enter username and password
+   - Set base path (default: `/Readest`)
+4. **Test Connection**: Click "Connect WebDAV" to verify settings
+5. **Enable Provider**: Once connected, WebDAV becomes the active storage provider
 
-## Known Limitations & Future Work
+## Technical Implementation
 
-### 1. Google Drive OAuth Flow
+### Provider Pattern
 
-The Google Drive OAuth2 authentication flow is not yet fully implemented. To complete this:
+Follows Readest's existing patterns:
+- **KOSyncClient**: Similar service class pattern for external sync
+- **Translators**: Plain object pattern for stateless providers
+- **Storage Providers**: Class-based pattern (appropriate for stateful providers with connection management)
 
-- Create OAuth2 consent screen in Google Cloud Console
-- Add API routes in `/apps/readest-app/src/pages/api/storage/googledrive/`:
-  - `auth.ts`: Initiate OAuth flow
-  - `callback.ts`: Handle OAuth callback
-- Implement token refresh mechanism
-- Store tokens securely
+### SSR Compatibility
 
-### 2. App Service Integration
+- Components use `'use client'` directive for client-side rendering
+- Storage service is dynamically imported only when needed
+- Provider registry uses lazy initialization to avoid SSR issues
+
+### File Operations
+
+The WebDAV provider uses the `webdav` npm package and implements:
+- `connect()`: Establishes connection and verifies server accessibility
+- `uploadFile()`: Uploads files with automatic directory creation
+- `downloadFile()`: Downloads files from WebDAV server
+- `deleteFile()`: Removes files from WebDAV server
+- `listFiles()`: Lists directory contents
+- `getFileInfo()`: Retrieves file metadata
+
+## Future Work
+
+### 1. App Service Integration
 
 The storage providers are implemented but not yet integrated with the main app service. To complete integration:
 
@@ -122,27 +126,28 @@ Example integration:
 
 ```typescript
 async uploadBook(book: Book) {
-  const activeProvider = storageService.getActiveProviderType();
+  const activeProvider = settings.storageProvider.activeProvider;
 
   if (activeProvider === 'readest') {
     // Use existing Readest cloud logic
     await this.uploadFileToCloud(localPath, remotePath);
-  } else {
+  } else if (activeProvider === 'webdav') {
     // Use storage provider service
+    const { storageService } = await import('@/services/storage');
     await storageService.uploadFile(localPath, remotePath, onProgress);
   }
 }
 ```
 
-### 3. File System Access API
+### 2. File System Access API
 
-The download methods in WebDAV and Google Drive providers currently create download links. For better UX, implement:
+The download method in WebDAV provider currently creates download links. For better UX, implement:
 
 - File System Access API for browser environments
 - Tauri file system API for desktop apps
 - Proper file saving with progress tracking
 
-### 4. Settings Migration
+### 3. Settings Migration
 
 When existing users upgrade, ensure:
 
@@ -150,39 +155,38 @@ When existing users upgrade, ensure:
 - Existing books continue to work without migration
 - Clear migration path if users want to switch providers
 
-### 5. Testing
+### 4. Testing
 
 Comprehensive testing needed for:
 
 - WebDAV connection with various servers (Nextcloud, ownCloud, etc.)
-- Google Drive OAuth flow
 - File upload/download with progress tracking
 - Error handling and retry logic
 - Network failure scenarios
 - Large file transfers
 - Concurrent operations
 
-### 6. Security Considerations
+### 5. Security Considerations
 
 - **Password Storage**: WebDAV passwords should be encrypted before storage
-- **Token Storage**: Google Drive tokens need secure storage
 - **HTTPS**: Enforce HTTPS for WebDAV connections
 - **Input Validation**: Validate all user inputs
+- **Credential Management**: Secure storage and retrieval of credentials
 
-### 7. Performance Optimizations
+### 6. Performance Optimizations
 
 - Implement chunked uploads for large files
 - Add caching layer for frequently accessed files
 - Implement resumable uploads/downloads
 - Add bandwidth throttling options
 
-### 8. Additional Features
+### 7. Additional Features
 
 - **Sync Conflict Resolution**: Handle conflicts when files are modified on multiple devices
 - **Selective Sync**: Allow users to choose which books to sync
 - **Background Sync**: Implement background synchronization
 - **Offline Mode**: Better offline support with queue management
-- **Multi-Provider**: Support multiple providers simultaneously
+- **Multi-Provider**: Support multiple providers simultaneously (future enhancement)
 
 ## File Structure
 
@@ -197,8 +201,7 @@ apps/readest-app/src/
 │           ├── base.ts
 │           ├── index.ts
 │           ├── readest.ts
-│           ├── webdav.ts
-│           └── googledrive.ts
+│           └── webdav.ts
 ├── types/
 │   └── settings.ts (updated)
 ├── app/
@@ -213,22 +216,32 @@ apps/readest-app/src/
 
 ## Testing Instructions
 
-1. **WebDAV Testing**:
-   ```bash
-   # Set up a local WebDAV server for testing
-   docker run -d -p 8080:80 bytemark/webdav
+### WebDAV Testing
 
-   # Configure in Readest:
-   # - URL: http://localhost:8080
-   # - Username: user
-   # - Password: password
+1. **Set up a local WebDAV server for testing**:
+   ```bash
+   docker run -d -p 8080:80 bytemark/webdav
    ```
 
-2. **Google Drive Testing**:
-   - Complete OAuth implementation first
-   - Create test Google Cloud project
-   - Enable Google Drive API
-   - Test with limited scope folder
+2. **Configure in Readest**:
+   - URL: `http://localhost:8080`
+   - Username: `user`
+   - Password: `password`
+   - Base Path: `/Readest`
+
+3. **Test operations**:
+   - Connect to server
+   - Switch active provider to WebDAV
+   - Upload a book (once integrated with app service)
+   - Download a book
+   - Delete a book
+
+### Production WebDAV Servers
+
+Test with real WebDAV servers:
+- **Nextcloud**: `https://your-nextcloud.com/remote.php/dav/files/username`
+- **ownCloud**: `https://your-owncloud.com/remote.php/dav/files/username`
+- **Apache with mod_dav**: `https://your-server.com/webdav`
 
 ## Notes
 
@@ -236,15 +249,10 @@ apps/readest-app/src/
 - All providers implement the same interface for consistency
 - The UI follows Readest's design system (DaisyUI components)
 - Settings are persisted using the existing settings store
-- The implementation is extensible - new providers can be added easily
+- The implementation is extensible - new providers can be added easily by implementing the `StorageProvider` interface
 
-## Next Steps
+## Commits
 
-1. Complete Google Drive OAuth implementation
-2. Integrate storage providers with app service
-3. Implement File System Access API for downloads
-4. Add encryption for sensitive credentials
-5. Comprehensive testing with real servers
-6. Add error recovery and retry logic
-7. Implement progress tracking for large transfers
-8. Add documentation for users
+- Initial implementation: WebDAV and Google Drive support
+- Fixed SSR issues with lazy loading and client-side rendering
+- Removed Google Drive to simplify implementation and focus on WebDAV
