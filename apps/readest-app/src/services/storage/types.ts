@@ -1,4 +1,4 @@
-export type StorageProviderType = 'readest' | 'webdav' | 'googledrive';
+export type StorageProviderType = 'readest' | 'webdav';
 
 export interface StorageProvider {
   name: StorageProviderType;
@@ -38,13 +38,6 @@ export interface StorageCredentials {
     basePath?: string;
   };
 
-  // For Google Drive
-  googleDrive?: {
-    accessToken: string;
-    refreshToken?: string;
-    folderId?: string;
-  };
-
   // For Readest Cloud (existing)
   readest?: {
     enabled: boolean;
@@ -63,7 +56,7 @@ export interface FileInfo {
   size: number;
   modifiedAt: Date;
   isDirectory: boolean;
-  id?: string; // For cloud providers like Google Drive
+  id?: string;
 }
 
 export interface FileTransfer {
@@ -88,18 +81,10 @@ export interface WebDAVSettings {
   basePath: string;
 }
 
-export interface GoogleDriveSettings {
-  enabled: boolean;
-  accessToken: string;
-  refreshToken: string;
-  folderId: string;
-}
-
 export interface StorageProviderSettings {
   activeProvider: StorageProviderType;
   readest: {
     enabled: boolean;
   };
   webdav: WebDAVSettings;
-  googleDrive: GoogleDriveSettings;
 }
