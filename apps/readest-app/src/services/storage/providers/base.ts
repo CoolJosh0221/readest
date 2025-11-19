@@ -22,16 +22,15 @@ export abstract class BaseStorageProvider implements StorageProvider {
   }
 
   abstract uploadFile(
-    localPath: string,
+    file: File | ArrayBuffer | Blob,
     remotePath: string,
     onProgress?: ProgressHandler,
   ): Promise<void>;
 
   abstract downloadFile(
     remotePath: string,
-    localPath: string,
     onProgress?: ProgressHandler,
-  ): Promise<void>;
+  ): Promise<ArrayBuffer>;
 
   abstract deleteFile(remotePath: string): Promise<void>;
 

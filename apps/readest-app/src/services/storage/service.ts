@@ -76,7 +76,7 @@ class StorageService {
    * Upload a file using the active provider
    */
   async uploadFile(
-    localPath: string,
+    file: File | ArrayBuffer | Blob,
     remotePath: string,
     onProgress?: ProgressHandler,
   ): Promise<void> {
@@ -84,7 +84,7 @@ class StorageService {
       throw new Error('No active storage provider');
     }
 
-    await this.activeProvider.uploadFile(localPath, remotePath, onProgress);
+    await this.activeProvider.uploadFile(file, remotePath, onProgress);
   }
 
   /**
@@ -92,14 +92,13 @@ class StorageService {
    */
   async downloadFile(
     remotePath: string,
-    localPath: string,
     onProgress?: ProgressHandler,
-  ): Promise<void> {
+  ): Promise<ArrayBuffer> {
     if (!this.activeProvider) {
       throw new Error('No active storage provider');
     }
 
-    await this.activeProvider.downloadFile(remotePath, localPath, onProgress);
+    return await this.activeProvider.downloadFile(remotePath, onProgress);
   }
 
   /**

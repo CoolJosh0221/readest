@@ -110,44 +110,34 @@ The WebDAV provider uses the `webdav` npm package and implements:
 - `listFiles()`: Lists directory contents
 - `getFileInfo()`: Retrieves file metadata
 
+## Completed Integration
+
+### 1. App Service Integration ✓
+
+The storage providers have been successfully integrated with the main app service.
+
+**Modified `/apps/readest-app/src/services/appService.ts`**:
+
+- Updated `uploadBook()` to check activeProvider and use WebDAV or Readest Cloud accordingly
+- Updated `downloadBook()` to check activeProvider and use WebDAV or Readest Cloud accordingly
+- Updated `deleteBook()` to check activeProvider and use WebDAV or Readest Cloud accordingly
+
+**Implementation Details**:
+
+- When activeProvider is 'webdav', the methods dynamically import and initialize the storage service
+- When activeProvider is 'readest' or undefined, the methods use the existing Readest Cloud logic
+- WebDAV connection is automatically established if not already connected
+- Settings are passed as optional parameters to preserve backward compatibility
+
+**Provider Interface Changes**:
+
+- `uploadFile()` now accepts File/ArrayBuffer/Blob instead of local path for better abstraction
+- `downloadFile()` now returns ArrayBuffer instead of writing to path, allowing app service to handle file system operations
+- Removed unused ReadestStorageProvider wrapper as Readest Cloud is handled directly in appService
+
 ## Future Work
 
-### 1. App Service Integration
-
-The storage providers are implemented but not yet integrated with the main app service. To complete integration:
-
-**Modify `/apps/readest-app/src/services/appService.ts`**:
-
-- Update `uploadBook()` (lines 463-509) to use active storage provider
-- Update `downloadBook()` (lines 553-610) to use active storage provider
-- Update `deleteBook()` (lines 417-450) to use active storage provider
-
-Example integration:
-
-```typescript
-async uploadBook(book: Book) {
-  const activeProvider = settings.storageProvider.activeProvider;
-
-  if (activeProvider === 'readest') {
-    // Use existing Readest cloud logic
-    await this.uploadFileToCloud(localPath, remotePath);
-  } else if (activeProvider === 'webdav') {
-    // Use storage provider service
-    const { storageService } = await import('@/services/storage');
-    await storageService.uploadFile(localPath, remotePath, onProgress);
-  }
-}
-```
-
-### 2. File System Access API
-
-The download method in WebDAV provider currently creates download links. For better UX, implement:
-
-- File System Access API for browser environments
-- Tauri file system API for desktop apps
-- Proper file saving with progress tracking
-
-### 3. Settings Migration
+### 1. Settings Migration
 
 When existing users upgrade, ensure:
 
@@ -155,7 +145,7 @@ When existing users upgrade, ensure:
 - Existing books continue to work without migration
 - Clear migration path if users want to switch providers
 
-### 4. Testing
+### 2. Testing
 
 Comprehensive testing needed for:
 
@@ -166,21 +156,21 @@ Comprehensive testing needed for:
 - Large file transfers
 - Concurrent operations
 
-### 5. Security Considerations
+### 3. Security Considerations
 
 - **Password Storage**: WebDAV passwords should be encrypted before storage
 - **HTTPS**: Enforce HTTPS for WebDAV connections
 - **Input Validation**: Validate all user inputs
 - **Credential Management**: Secure storage and retrieval of credentials
 
-### 6. Performance Optimizations
+### 4. Performance Optimizations
 
 - Implement chunked uploads for large files
 - Add caching layer for frequently accessed files
 - Implement resumable uploads/downloads
 - Add bandwidth throttling options
 
-### 7. Additional Features
+### 5. Additional Features
 
 - **Sync Conflict Resolution**: Handle conflicts when files are modified on multiple devices
 - **Selective Sync**: Allow users to choose which books to sync
@@ -256,3 +246,6 @@ Test with real WebDAV servers:
 - Initial implementation: WebDAV and Google Drive support
 - Fixed SSR issues with lazy loading and client-side rendering
 - Removed Google Drive to simplify implementation and focus on WebDAV
+- Integrated WebDAV storage provider with appService (uploadBook, downloadBook, deleteBook)
+- Updated provider interfaces to use File/ArrayBuffer for better abstraction
+- Removed unused ReadestStorageProvider wrapper

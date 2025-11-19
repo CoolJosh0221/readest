@@ -117,7 +117,7 @@ export const StorageProviderSettingsWindow: React.FC = () => {
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSaveSettings = useCallback(
-    debounce((newSettings) => {
+    debounce((newSettings: typeof settings) => {
       setSettings(newSettings);
       saveSettings(envConfig, newSettings);
     }, 500),

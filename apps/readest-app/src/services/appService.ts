@@ -414,7 +414,7 @@ export abstract class BaseAppService implements AppService {
     }
   }
 
-  async deleteBook(book: Book, deleteAction: DeleteAction): Promise<void> {
+  async deleteBook(book: Book, deleteAction: DeleteAction, settings?: SystemSettings): Promise<void> {
     console.log('Deleting book with action:', deleteAction, book.title);
     if (deleteAction === 'local' || deleteAction === 'both') {
       const localDeleteFps =
@@ -435,14 +435,51 @@ export abstract class BaseAppService implements AppService {
       }
     }
     if ((deleteAction === 'cloud' || deleteAction === 'both') && book.uploadedAt) {
-      const fps = [getRemoteBookFilename(book), getCoverFilename(book)];
-      for (const fp of fps) {
-        console.log('Deleting uploaded file:', fp);
-        const cfp = `${CLOUD_BOOKS_SUBDIR}/${fp}`;
-        try {
-          deleteFile(cfp);
-        } catch (error) {
-          console.log('Failed to delete uploaded file:', error);
+      // Check which storage provider to use
+      const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
+
+      if (activeProvider === 'webdav') {
+        // Use WebDAV storage provider
+        const { storageService } = await import('@/services/storage');
+
+        // Initialize WebDAV provider if not already connected
+        if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== 'webdav') {
+          const webdavSettings = settings?.storageProvider?.webdav;
+          if (webdavSettings && webdavSettings.enabled) {
+            await storageService.setActiveProvider('webdav', {
+              webdav: {
+                url: webdavSettings.serverUrl,
+                username: webdavSettings.username,
+                password: webdavSettings.password,
+                basePath: webdavSettings.basePath,
+              },
+            });
+          } else {
+            throw new Error('WebDAV is not configured');
+          }
+        }
+
+        const fps = [getRemoteBookFilename(book), getCoverFilename(book)];
+        for (const fp of fps) {
+          console.log('Deleting uploaded file:', fp);
+          const remotePath = `${CLOUD_BOOKS_SUBDIR}/${fp}`;
+          try {
+            await storageService.deleteFile(remotePath);
+          } catch (error) {
+            console.log('Failed to delete uploaded file:', error);
+          }
+        }
+      } else {
+        // Use Readest Cloud storage (existing logic)
+        const fps = [getRemoteBookFilename(book), getCoverFilename(book)];
+        for (const fp of fps) {
+          console.log('Deleting uploaded file:', fp);
+          const cfp = `${CLOUD_BOOKS_SUBDIR}/${fp}`;
+          try {
+            deleteFile(cfp);
+          } catch (error) {
+            console.log('Failed to delete uploaded file:', error);
+          }
         }
       }
       book.uploadedAt = null;
@@ -460,7 +497,7 @@ export abstract class BaseAppService implements AppService {
     }
   }
 
-  async uploadBook(book: Book, onProgress?: ProgressHandler): Promise<void> {
+  async uploadBook(book: Book, onProgress?: ProgressHandler, settings?: SystemSettings): Promise<void> {
     let uploaded = false;
     const completedFiles = { count: 0 };
     let toUploadFpCount = 0;
@@ -481,20 +518,76 @@ export abstract class BaseAppService implements AppService {
 
     const handleProgress = createProgressHandler(toUploadFpCount, completedFiles, onProgress);
 
-    if (coverExist) {
-      const lfp = getCoverFilename(book);
-      const cfp = `${CLOUD_BOOKS_SUBDIR}/${getCoverFilename(book)}`;
-      await this.uploadFileToCloud(lfp, cfp, handleProgress, book.hash);
-      uploaded = true;
-      completedFiles.count++;
-    }
+    // Check which storage provider to use
+    const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
 
-    if (bookFileExist) {
-      const lfp = getLocalBookFilename(book);
-      const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
-      await this.uploadFileToCloud(lfp, cfp, handleProgress, book.hash);
-      uploaded = true;
-      completedFiles.count++;
+    if (activeProvider === 'webdav') {
+      // Use WebDAV storage provider
+      const { storageService } = await import('@/services/storage');
+
+      // Initialize WebDAV provider if not already connected
+      if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== 'webdav') {
+        const webdavSettings = settings?.storageProvider?.webdav;
+        if (webdavSettings && webdavSettings.enabled) {
+          await storageService.setActiveProvider('webdav', {
+            webdav: {
+              url: webdavSettings.serverUrl,
+              username: webdavSettings.username,
+              password: webdavSettings.password,
+              basePath: webdavSettings.basePath,
+            },
+          });
+        } else {
+          throw new Error('WebDAV is not configured');
+        }
+      }
+
+      if (coverExist) {
+        const lfp = getCoverFilename(book);
+        const remotePath = `${CLOUD_BOOKS_SUBDIR}/${getCoverFilename(book)}`;
+        const file = await this.fs.openFile(lfp, 'Books');
+        await storageService.uploadFile(file, remotePath, (progress) => {
+          handleProgress({
+            progress: progress.loaded,
+            total: progress.total,
+            transferSpeed: 0,
+          });
+        });
+        uploaded = true;
+        completedFiles.count++;
+      }
+
+      if (bookFileExist) {
+        const lfp = getLocalBookFilename(book);
+        const remotePath = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
+        const file = await this.fs.openFile(lfp, 'Books');
+        await storageService.uploadFile(file, remotePath, (progress) => {
+          handleProgress({
+            progress: progress.loaded,
+            total: progress.total,
+            transferSpeed: 0,
+          });
+        });
+        uploaded = true;
+        completedFiles.count++;
+      }
+    } else {
+      // Use Readest Cloud storage (existing logic)
+      if (coverExist) {
+        const lfp = getCoverFilename(book);
+        const cfp = `${CLOUD_BOOKS_SUBDIR}/${getCoverFilename(book)}`;
+        await this.uploadFileToCloud(lfp, cfp, handleProgress, book.hash);
+        uploaded = true;
+        completedFiles.count++;
+      }
+
+      if (bookFileExist) {
+        const lfp = getLocalBookFilename(book);
+        const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
+        await this.uploadFileToCloud(lfp, cfp, handleProgress, book.hash);
+        uploaded = true;
+        completedFiles.count++;
+      }
     }
 
     if (uploaded) {
@@ -555,6 +648,7 @@ export abstract class BaseAppService implements AppService {
     onlyCover = false,
     redownload = false,
     onProgress?: ProgressHandler,
+    settings?: SystemSettings,
   ): Promise<void> {
     let bookDownloaded = false;
     let bookCoverDownloaded = false;
@@ -576,30 +670,95 @@ export abstract class BaseAppService implements AppService {
       await this.fs.createDir(getDir(book), 'Books');
     }
 
-    try {
-      if (needDownCover) {
-        const lfp = getCoverFilename(book);
-        const cfp = `${CLOUD_BOOKS_SUBDIR}/${lfp}`;
-        await this.downloadCloudFile(lfp, cfp, handleProgress);
-        bookCoverDownloaded = true;
+    // Check which storage provider to use
+    const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
+
+    if (activeProvider === 'webdav') {
+      // Use WebDAV storage provider
+      const { storageService } = await import('@/services/storage');
+
+      // Initialize WebDAV provider if not already connected
+      if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== 'webdav') {
+        const webdavSettings = settings?.storageProvider?.webdav;
+        if (webdavSettings && webdavSettings.enabled) {
+          await storageService.setActiveProvider('webdav', {
+            webdav: {
+              url: webdavSettings.serverUrl,
+              username: webdavSettings.username,
+              password: webdavSettings.password,
+              basePath: webdavSettings.basePath,
+            },
+          });
+        } else {
+          throw new Error('WebDAV is not configured');
+        }
       }
-    } catch (error) {
-      // don't throw error here since some books may not have cover images at all
-      console.log(`Failed to download cover file for book: '${book.title}'`, error);
-    } finally {
-      if (needDownCover) {
+
+      try {
+        if (needDownCover) {
+          const lfp = getCoverFilename(book);
+          const remotePath = `${CLOUD_BOOKS_SUBDIR}/${lfp}`;
+          const arrayBuffer = await storageService.downloadFile(remotePath, (progress) => {
+            handleProgress({
+              progress: progress.loaded,
+              total: progress.total,
+              transferSpeed: 0,
+            });
+          });
+          await this.fs.writeFile(lfp, 'Books', arrayBuffer);
+          bookCoverDownloaded = true;
+        }
+      } catch (error) {
+        console.log(`Failed to download cover file for book: '${book.title}'`, error);
+      } finally {
+        if (needDownCover) {
+          completedFiles.count++;
+        }
+      }
+
+      if (needDownBook) {
+        const lfp = getLocalBookFilename(book);
+        const remotePath = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
+        const arrayBuffer = await storageService.downloadFile(remotePath, (progress) => {
+          handleProgress({
+            progress: progress.loaded,
+            total: progress.total,
+            transferSpeed: 0,
+          });
+        });
+        await this.fs.writeFile(lfp, 'Books', arrayBuffer);
+        const localFullpath = `${this.localBooksDir}/${lfp}`;
+        bookDownloaded = await this.fs.exists(localFullpath, 'None');
+        completedFiles.count++;
+      }
+    } else {
+      // Use Readest Cloud storage (existing logic)
+      try {
+        if (needDownCover) {
+          const lfp = getCoverFilename(book);
+          const cfp = `${CLOUD_BOOKS_SUBDIR}/${lfp}`;
+          await this.downloadCloudFile(lfp, cfp, handleProgress);
+          bookCoverDownloaded = true;
+        }
+      } catch (error) {
+        // don't throw error here since some books may not have cover images at all
+        console.log(`Failed to download cover file for book: '${book.title}'`, error);
+      } finally {
+        if (needDownCover) {
+          completedFiles.count++;
+        }
+      }
+
+      if (needDownBook) {
+        const lfp = getLocalBookFilename(book);
+        const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
+        await this.downloadCloudFile(lfp, cfp, handleProgress);
+        const localFullpath = `${this.localBooksDir}/${lfp}`;
+        bookDownloaded = await this.fs.exists(localFullpath, 'None');
         completedFiles.count++;
       }
     }
 
-    if (needDownBook) {
-      const lfp = getLocalBookFilename(book);
-      const cfp = `${CLOUD_BOOKS_SUBDIR}/${getRemoteBookFilename(book)}`;
-      await this.downloadCloudFile(lfp, cfp, handleProgress);
-      const localFullpath = `${this.localBooksDir}/${lfp}`;
-      bookDownloaded = await this.fs.exists(localFullpath, 'None');
-      completedFiles.count++;
-    }
     // some books may not have cover image, so we need to check if the book is downloaded
     if (bookDownloaded || (!onlyCover && !needDownBook)) {
       book.downloadedAt = Date.now();

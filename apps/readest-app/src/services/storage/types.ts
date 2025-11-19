@@ -12,15 +12,14 @@ export interface StorageProvider {
 
   // File operations
   uploadFile(
-    localPath: string,
+    file: File | ArrayBuffer | Blob,
     remotePath: string,
     onProgress?: ProgressHandler,
   ): Promise<void>;
   downloadFile(
     remotePath: string,
-    localPath: string,
     onProgress?: ProgressHandler,
-  ): Promise<void>;
+  ): Promise<ArrayBuffer>;
   deleteFile(remotePath: string): Promise<void>;
   listFiles(remotePath: string): Promise<FileInfo[]>;
 
