@@ -438,24 +438,39 @@ export abstract class BaseAppService implements AppService {
       // Check which storage provider to use
       const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
 
-      if (activeProvider === 'webdav') {
-        // Use WebDAV storage provider
+      if (activeProvider === 'webdav' || activeProvider === 'googledrive') {
+        // Use storage provider (WebDAV or Google Drive)
         const { storageService } = await import('@/services/storage');
 
-        // Initialize WebDAV provider if not already connected
-        if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== 'webdav') {
-          const webdavSettings = settings?.storageProvider?.webdav;
-          if (webdavSettings && webdavSettings.enabled) {
-            await storageService.setActiveProvider('webdav', {
-              webdav: {
-                url: webdavSettings.serverUrl,
-                username: webdavSettings.username,
-                password: webdavSettings.password,
-                basePath: webdavSettings.basePath,
-              },
-            });
-          } else {
-            throw new Error('WebDAV is not configured');
+        // Initialize provider if not already connected
+        if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== activeProvider) {
+          if (activeProvider === 'webdav') {
+            const webdavSettings = settings?.storageProvider?.webdav;
+            if (webdavSettings && webdavSettings.enabled) {
+              await storageService.setActiveProvider('webdav', {
+                webdav: {
+                  url: webdavSettings.serverUrl,
+                  username: webdavSettings.username,
+                  password: webdavSettings.password,
+                  basePath: webdavSettings.basePath,
+                },
+              });
+            } else {
+              throw new Error('WebDAV is not configured');
+            }
+          } else if (activeProvider === 'googledrive') {
+            const googleDriveSettings = settings?.storageProvider?.googleDrive;
+            if (googleDriveSettings && googleDriveSettings.enabled) {
+              await storageService.setActiveProvider('googledrive', {
+                googledrive: {
+                  accessToken: googleDriveSettings.accessToken,
+                  refreshToken: googleDriveSettings.refreshToken,
+                  folderId: googleDriveSettings.folderId,
+                },
+              });
+            } else {
+              throw new Error('Google Drive is not configured');
+            }
           }
         }
 
@@ -521,24 +536,39 @@ export abstract class BaseAppService implements AppService {
     // Check which storage provider to use
     const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
 
-    if (activeProvider === 'webdav') {
-      // Use WebDAV storage provider
+    if (activeProvider === 'webdav' || activeProvider === 'googledrive') {
+      // Use storage provider (WebDAV or Google Drive)
       const { storageService } = await import('@/services/storage');
 
-      // Initialize WebDAV provider if not already connected
-      if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== 'webdav') {
-        const webdavSettings = settings?.storageProvider?.webdav;
-        if (webdavSettings && webdavSettings.enabled) {
-          await storageService.setActiveProvider('webdav', {
-            webdav: {
-              url: webdavSettings.serverUrl,
-              username: webdavSettings.username,
-              password: webdavSettings.password,
-              basePath: webdavSettings.basePath,
-            },
-          });
-        } else {
-          throw new Error('WebDAV is not configured');
+      // Initialize provider if not already connected
+      if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== activeProvider) {
+        if (activeProvider === 'webdav') {
+          const webdavSettings = settings?.storageProvider?.webdav;
+          if (webdavSettings && webdavSettings.enabled) {
+            await storageService.setActiveProvider('webdav', {
+              webdav: {
+                url: webdavSettings.serverUrl,
+                username: webdavSettings.username,
+                password: webdavSettings.password,
+                basePath: webdavSettings.basePath,
+              },
+            });
+          } else {
+            throw new Error('WebDAV is not configured');
+          }
+        } else if (activeProvider === 'googledrive') {
+          const googleDriveSettings = settings?.storageProvider?.googleDrive;
+          if (googleDriveSettings && googleDriveSettings.enabled) {
+            await storageService.setActiveProvider('googledrive', {
+              googledrive: {
+                accessToken: googleDriveSettings.accessToken,
+                refreshToken: googleDriveSettings.refreshToken,
+                folderId: googleDriveSettings.folderId,
+              },
+            });
+          } else {
+            throw new Error('Google Drive is not configured');
+          }
         }
       }
 
@@ -673,24 +703,39 @@ export abstract class BaseAppService implements AppService {
     // Check which storage provider to use
     const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
 
-    if (activeProvider === 'webdav') {
-      // Use WebDAV storage provider
+    if (activeProvider === 'webdav' || activeProvider === 'googledrive') {
+      // Use storage provider (WebDAV or Google Drive)
       const { storageService } = await import('@/services/storage');
 
-      // Initialize WebDAV provider if not already connected
-      if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== 'webdav') {
-        const webdavSettings = settings?.storageProvider?.webdav;
-        if (webdavSettings && webdavSettings.enabled) {
-          await storageService.setActiveProvider('webdav', {
-            webdav: {
-              url: webdavSettings.serverUrl,
-              username: webdavSettings.username,
-              password: webdavSettings.password,
-              basePath: webdavSettings.basePath,
-            },
-          });
-        } else {
-          throw new Error('WebDAV is not configured');
+      // Initialize provider if not already connected
+      if (!storageService.getActiveProvider() || storageService.getActiveProviderType() !== activeProvider) {
+        if (activeProvider === 'webdav') {
+          const webdavSettings = settings?.storageProvider?.webdav;
+          if (webdavSettings && webdavSettings.enabled) {
+            await storageService.setActiveProvider('webdav', {
+              webdav: {
+                url: webdavSettings.serverUrl,
+                username: webdavSettings.username,
+                password: webdavSettings.password,
+                basePath: webdavSettings.basePath,
+              },
+            });
+          } else {
+            throw new Error('WebDAV is not configured');
+          }
+        } else if (activeProvider === 'googledrive') {
+          const googleDriveSettings = settings?.storageProvider?.googleDrive;
+          if (googleDriveSettings && googleDriveSettings.enabled) {
+            await storageService.setActiveProvider('googledrive', {
+              googledrive: {
+                accessToken: googleDriveSettings.accessToken,
+                refreshToken: googleDriveSettings.refreshToken,
+                folderId: googleDriveSettings.folderId,
+              },
+            });
+          } else {
+            throw new Error('Google Drive is not configured');
+          }
         }
       }
 

@@ -1,7 +1,9 @@
 import type { StorageProvider, StorageProviderType } from '../types';
 import { WebDAVStorageProvider } from './webdav';
+import { GoogleDriveStorageProvider } from './googledrive';
 
 export { WebDAVStorageProvider } from './webdav';
+export { GoogleDriveStorageProvider } from './googledrive';
 
 // Provider registry with lazy initialization
 const providers = new Map<StorageProviderType, StorageProvider>();
@@ -11,6 +13,9 @@ function getOrCreateProvider(type: StorageProviderType): StorageProvider | undef
     switch (type) {
       case 'webdav':
         providers.set(type, new WebDAVStorageProvider());
+        break;
+      case 'googledrive':
+        providers.set(type, new GoogleDriveStorageProvider());
         break;
       case 'readest':
         // Readest Cloud uses the existing storage system directly in appService
@@ -28,11 +33,12 @@ export function getProvider(
 }
 
 export function getAllProviders(): StorageProvider[] {
-  // Only create WebDAV provider
+  // Create WebDAV and Google Drive providers
   getOrCreateProvider('webdav');
+  getOrCreateProvider('googledrive');
   return Array.from(providers.values());
 }
 
 export function getProviderTypes(): StorageProviderType[] {
-  return ['readest', 'webdav'];
+  return ['readest', 'webdav', 'googledrive'];
 }

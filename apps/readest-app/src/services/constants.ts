@@ -16,6 +16,7 @@ import {
   SystemSettings,
   StorageProviderSettings,
   WebDAVSettings,
+  GoogleDriveSettings,
 } from '@/types/settings';
 import { UserStorageQuota, UserDailyTranslationQuota } from '@/types/quota';
 import { getDefaultMaxBlockSize, getDefaultMaxInlineSize } from '@/utils/config';
@@ -66,12 +67,20 @@ export const DEFAULT_WEBDAV_SETTINGS: WebDAVSettings = {
   basePath: '/Readest',
 };
 
+export const DEFAULT_GOOGLEDRIVE_SETTINGS: GoogleDriveSettings = {
+  enabled: false,
+  accessToken: '',
+  refreshToken: '',
+  folderId: 'root',
+};
+
 export const DEFAULT_STORAGE_PROVIDER_SETTINGS: StorageProviderSettings = {
   activeProvider: 'readest',
   readest: {
     enabled: true,
   },
   webdav: DEFAULT_WEBDAV_SETTINGS,
+  googleDrive: DEFAULT_GOOGLEDRIVE_SETTINGS,
 };
 
 export const DEFAULT_SYSTEM_SETTINGS: Partial<SystemSettings> = {

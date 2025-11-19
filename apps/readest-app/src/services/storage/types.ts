@@ -1,4 +1,4 @@
-export type StorageProviderType = 'readest' | 'webdav';
+export type StorageProviderType = 'readest' | 'webdav' | 'googledrive';
 
 export interface StorageProvider {
   name: StorageProviderType;
@@ -35,6 +35,13 @@ export interface StorageCredentials {
     username: string;
     password: string;
     basePath?: string;
+  };
+
+  // For Google Drive
+  googledrive?: {
+    accessToken: string;
+    refreshToken: string;
+    folderId?: string;
   };
 
   // For Readest Cloud (existing)
