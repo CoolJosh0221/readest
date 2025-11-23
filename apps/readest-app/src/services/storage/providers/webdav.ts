@@ -102,19 +102,25 @@ export class WebDAVStorageProvider extends BaseStorageProvider {
   }
 
   async uploadFile(
-    localPath: string,
+    file: File | ArrayBuffer | Blob,
     remotePath: string,
     onProgress?: ProgressHandler,
   ): Promise<void> {
     this.ensureConnected();
 
     try {
-      // Read the file from localPath
-      const response = await fetch(localPath);
-      const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      const buffer = Buffer.from(arrayBuffer);
+      // Convert file to ArrayBuffer
+      let arrayBuffer: ArrayBuffer;
+      if (file instanceof ArrayBuffer) {
+        arrayBuffer = file;
+      } else if (typeof Blob !== 'undefined' && file instanceof Blob) {
+        // Blob is the base class for File in browsers
+        arrayBuffer = await file.arrayBuffer();
+      } else {
+        throw new Error('Invalid file type');
+      }
 
+      const buffer = Buffer.from(arrayBuffer);
       const fullPath = this.getFullPath(remotePath);
 
       // Ensure directory exists
@@ -144,9 +150,8 @@ export class WebDAVStorageProvider extends BaseStorageProvider {
 
   async downloadFile(
     remotePath: string,
-    localPath: string,
     onProgress?: ProgressHandler,
-  ): Promise<void> {
+  ): Promise<ArrayBuffer> {
     this.ensureConnected();
 
     try {
@@ -155,23 +160,17 @@ export class WebDAVStorageProvider extends BaseStorageProvider {
       // Download the file
       const contents = await this.client!.getFileContents(fullPath);
 
-      // Convert to Blob and save
+      // Convert Buffer to ArrayBuffer
       const buffer = contents as Buffer;
-      const blob = new Blob([buffer]);
-
-      // In a browser environment, we'd use the File System Access API
-      // For now, we'll create a download link
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = localPath.split('/').pop() || 'download';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      const arrayBuffer: ArrayBuffer = buffer.buffer.slice(
+        buffer.byteOffset,
+        buffer.byteOffset + buffer.byteLength
+      ) as ArrayBuffer;
 
       // Call progress handler with completion
-      this.handleProgress(buffer.length, buffer.length, onProgress);
+      this.handleProgress(arrayBuffer.byteLength, arrayBuffer.byteLength, onProgress);
+
+      return arrayBuffer;
     } catch (error) {
       throw new Error(
         `Failed to download file: ${error instanceof Error ? error.message : 'Unknown error'}`,

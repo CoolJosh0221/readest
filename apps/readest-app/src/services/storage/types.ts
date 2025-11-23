@@ -1,4 +1,4 @@
-export type StorageProviderType = 'readest' | 'webdav' | 'googledrive';
+export type StorageProviderType = 'readest' | 'webdav' | 'googledrive' | 'mega';
 
 export interface StorageProvider {
   name: StorageProviderType;
@@ -12,15 +12,14 @@ export interface StorageProvider {
 
   // File operations
   uploadFile(
-    localPath: string,
+    file: File | ArrayBuffer | Blob,
     remotePath: string,
     onProgress?: ProgressHandler,
   ): Promise<void>;
   downloadFile(
     remotePath: string,
-    localPath: string,
     onProgress?: ProgressHandler,
-  ): Promise<void>;
+  ): Promise<ArrayBuffer>;
   deleteFile(remotePath: string): Promise<void>;
   listFiles(remotePath: string): Promise<FileInfo[]>;
 
@@ -39,10 +38,17 @@ export interface StorageCredentials {
   };
 
   // For Google Drive
-  googleDrive?: {
+  googledrive?: {
     accessToken: string;
-    refreshToken?: string;
+    refreshToken: string;
     folderId?: string;
+  };
+
+  // For MEGA
+  mega?: {
+    email: string;
+    password: string;
+    folderPath?: string;
   };
 
   // For Readest Cloud (existing)
@@ -63,7 +69,7 @@ export interface FileInfo {
   size: number;
   modifiedAt: Date;
   isDirectory: boolean;
-  id?: string; // For cloud providers like Google Drive
+  id?: string;
 }
 
 export interface FileTransfer {
@@ -88,18 +94,10 @@ export interface WebDAVSettings {
   basePath: string;
 }
 
-export interface GoogleDriveSettings {
-  enabled: boolean;
-  accessToken: string;
-  refreshToken: string;
-  folderId: string;
-}
-
 export interface StorageProviderSettings {
   activeProvider: StorageProviderType;
   readest: {
     enabled: boolean;
   };
   webdav: WebDAVSettings;
-  googleDrive: GoogleDriveSettings;
 }
