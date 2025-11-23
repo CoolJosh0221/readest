@@ -1,4 +1,4 @@
-export type StorageProviderType = 'readest' | 'webdav' | 'googledrive';
+export type StorageProviderType = 'readest' | 'webdav' | 'googledrive' | 'mega';
 
 export interface StorageProvider {
   name: StorageProviderType;
@@ -42,6 +42,13 @@ export interface StorageCredentials {
     accessToken: string;
     refreshToken: string;
     folderId?: string;
+  };
+
+  // For MEGA
+  mega?: {
+    email: string;
+    password: string;
+    folderPath?: string;
   };
 
   // For Readest Cloud (existing)

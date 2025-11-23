@@ -438,8 +438,8 @@ export abstract class BaseAppService implements AppService {
       // Check which storage provider to use
       const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
 
-      if (activeProvider === 'webdav' || activeProvider === 'googledrive') {
-        // Use storage provider (WebDAV or Google Drive)
+      if (activeProvider === 'webdav' || activeProvider === 'googledrive' || activeProvider === 'mega') {
+        // Use storage provider (WebDAV, Google Drive, or MEGA)
         const { storageService } = await import('@/services/storage');
 
         // Initialize provider if not already connected
@@ -470,6 +470,19 @@ export abstract class BaseAppService implements AppService {
               });
             } else {
               throw new Error('Google Drive is not configured');
+            }
+          } else if (activeProvider === 'mega') {
+            const megaSettings = settings?.storageProvider?.mega;
+            if (megaSettings && megaSettings.enabled) {
+              await storageService.setActiveProvider('mega', {
+                mega: {
+                  email: megaSettings.email,
+                  password: megaSettings.password,
+                  folderPath: megaSettings.folderPath,
+                },
+              });
+            } else {
+              throw new Error('MEGA is not configured');
             }
           }
         }
@@ -536,8 +549,8 @@ export abstract class BaseAppService implements AppService {
     // Check which storage provider to use
     const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
 
-    if (activeProvider === 'webdav' || activeProvider === 'googledrive') {
-      // Use storage provider (WebDAV or Google Drive)
+    if (activeProvider === 'webdav' || activeProvider === 'googledrive' || activeProvider === 'mega') {
+      // Use storage provider (WebDAV, Google Drive, or MEGA)
       const { storageService } = await import('@/services/storage');
 
       // Initialize provider if not already connected
@@ -568,6 +581,19 @@ export abstract class BaseAppService implements AppService {
             });
           } else {
             throw new Error('Google Drive is not configured');
+          }
+        } else if (activeProvider === 'mega') {
+          const megaSettings = settings?.storageProvider?.mega;
+          if (megaSettings && megaSettings.enabled) {
+            await storageService.setActiveProvider('mega', {
+              mega: {
+                email: megaSettings.email,
+                password: megaSettings.password,
+                folderPath: megaSettings.folderPath,
+              },
+            });
+          } else {
+            throw new Error('MEGA is not configured');
           }
         }
       }
@@ -703,8 +729,8 @@ export abstract class BaseAppService implements AppService {
     // Check which storage provider to use
     const activeProvider = settings?.storageProvider?.activeProvider || 'readest';
 
-    if (activeProvider === 'webdav' || activeProvider === 'googledrive') {
-      // Use storage provider (WebDAV or Google Drive)
+    if (activeProvider === 'webdav' || activeProvider === 'googledrive' || activeProvider === 'mega') {
+      // Use storage provider (WebDAV, Google Drive, or MEGA)
       const { storageService } = await import('@/services/storage');
 
       // Initialize provider if not already connected
@@ -735,6 +761,19 @@ export abstract class BaseAppService implements AppService {
             });
           } else {
             throw new Error('Google Drive is not configured');
+          }
+        } else if (activeProvider === 'mega') {
+          const megaSettings = settings?.storageProvider?.mega;
+          if (megaSettings && megaSettings.enabled) {
+            await storageService.setActiveProvider('mega', {
+              mega: {
+                email: megaSettings.email,
+                password: megaSettings.password,
+                folderPath: megaSettings.folderPath,
+              },
+            });
+          } else {
+            throw new Error('MEGA is not configured');
           }
         }
       }
